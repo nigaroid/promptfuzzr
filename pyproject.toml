@@ -1,0 +1,30 @@
+[project]
+name = "promptfuzzr"
+version = "0.1.0"
+description = "Mutation-based prompt injection fuzzing framework for LLM applications and agents"
+requires-python = ">=3.11"
+dependencies = [
+    "typer>=0.12",
+    "pydantic>=2.6",
+    "rich>=13.7",
+    "PyYAML>=6.0",
+    "jinja2>=3.1",
+    "requests>=2.31",
+    "deep-translator>=1.11",
+    "anthropic>=1.0",
+    "openai>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-cov>=5.0"]
+dashboard = ["streamlit>=1.35"]
+
+[project.scripts]
+promptfuzzr = "promptfuzzr.cli:app"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["promptfuzzr*"]

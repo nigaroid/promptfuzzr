@@ -1,0 +1,24 @@
+# RunConfig for a local OpenAI-compatible router (e.g. omniroute).
+# Set these before running:
+#   $env:OPENAI_COMPAT_API_KEY = "your key"
+#   $env:OPENAI_COMPAT_BASE_URL = "http://localhost:20128/v1"
+
+target_id: lab_agent
+corpus_dir: ../promptfuzzr/corpus/seeds
+db_path: promptfuzzr.db
+axes: [delivery, encoding]
+
+model_provider: openai_compat
+model_name: kr/claude-sonnet-4.5
+
+retry_policy:
+  max_retries: 1   # temporarily low, just to get a fast first run — see note below
+  backoff_seconds: 1.5
+
+authority_policy:
+  role: support_agent
+  allowed_tools:
+    - lookup_order
+    - get_weather
+
+concurrency: 4
