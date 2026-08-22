@@ -1,10 +1,10 @@
-# promptfuzzr
+# PromptFuzzr
 
 Mutation-based prompt injection fuzzing framework for LLM applications and
 agents. See `docs/roadmap.md` (copy of the project roadmap) for the full
 design rationale, attack taxonomy, and phased build plan.
 
-## Quickstart (once implemented)
+## Quickstart
 
 ```bash
 pip install -e ".[dev]"
@@ -32,6 +32,3 @@ promptfuzzr/
   report/           coverage matrix, defense-delta, export
 tests/
 ```
-
-Status: scaffolding only — see inline `TODO(phase N)` markers for the
-build sequence.
