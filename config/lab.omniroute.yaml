@@ -5,7 +5,6 @@
 
 target_id: lab_agent
 corpus_dir: ../promptfuzzr/corpus/seeds
-db_path: promptfuzzr.db
 axes: [delivery, encoding]
 
 model_provider: openai_compat

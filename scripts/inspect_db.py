@@ -1,14 +1,24 @@
-"""Quick inspection of promptfuzzr.db without needing the sqlite3 CLI
-installed — Python's sqlite3 module is in the standard library, so
-this works with no extra install.
+"""Quick inspection of promptfuzzr's database without needing the
+sqlite3 CLI installed — Python's sqlite3 module is in the standard
+library, so this works with no extra install.
 
 Usage: python inspect_db.py [path-to-db]
+
+With no argument, inspects the application's actual database at
+get_db_path() (~/.promptfuzzr/db/promptfuzzr.db) — the same file every
+`promptfuzzr fuzz` run writes to, since that location is centralized
+and no longer configurable per-run. An explicit path argument is still
+accepted for inspecting an old, exported, or otherwise-specific db
+file — that's a normal, sanctioned use of this diagnostic script, not
+a way to redirect where the application itself stores data.
 """
 
 import sqlite3
 import sys
 
-db_path = sys.argv[1] if len(sys.argv) > 1 else "promptfuzzr.db"
+from promptfuzzr.storage.paths import get_db_path
+
+db_path = sys.argv[1] if len(sys.argv) > 1 else str(get_db_path())
 
 conn = sqlite3.connect(db_path)
 conn.row_factory = sqlite3.Row

@@ -1,9 +1,14 @@
 """Run configuration: target settings, retry policy, session/authority
 policy, and paths. Loaded from a YAML config file and/or CLI flags.
+
+The SQLite database location is deliberately NOT part of this config —
+see promptfuzzr/storage/paths.py. It's an application concern (always
+~/.promptfuzzr/db/), not a per-run setting.
 """
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -47,7 +52,6 @@ class AuthorityPolicy:
 class RunConfig:
     target_id: str
     corpus_dir: Path
-    db_path: Path = Path("promptfuzzr.db")
     axes: list[str] = field(default_factory=lambda: ["delivery", "encoding"])
     retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
     authority_policy: AuthorityPolicy | None = None
@@ -65,6 +69,13 @@ class RunConfig:
     # real model. Use it to validate the success path (judge, findings,
     # minimizer) — never to estimate real-world attack rates.
     target_profile: str = "real"
+
+    # External agent under test exposing an OpenAI-compatible
+    # /v1/chat/completions endpoint (e.g. DVAA's LegacyBot at
+    # http://localhost:7003). When set, this takes precedence over
+    # model_provider/target_profile: the corpus is sent straight to the
+    # remote agent, which brings its own system prompt and tools.
+    agent_endpoint: str | None = None
 
     # Phase 3: which delivery surface and propagation mode this run uses.
     # delivery: direct | webpage | email | file | repo_comment | rag_doc | tool_schema
@@ -84,18 +95,36 @@ class RunConfig:
         dataclass defaults above. See config/lab.example.yaml for the
         expected shape.
 
-        `corpus_dir` and `db_path` are resolved to absolute paths
-        relative to the CONFIG FILE's own directory, not the process's
-        current working directory. This is what makes a relative path
-        in the YAML (e.g. "promptfuzzr/corpus/seeds") portable across
-        machines and invocation locations — `promptfuzzr fuzz --config
-        config/lab.yaml` resolves correctly whether you run it from the
-        project root or somewhere else, without hardcoding an absolute,
-        user-specific path into a file meant to be shared/committed.
+        `corpus_dir` is resolved to an absolute path relative to the
+        CONFIG FILE's own directory, not the process's current working
+        directory. This is what makes a relative path in the YAML (e.g.
+        "promptfuzzr/corpus/seeds") portable across machines and
+        invocation locations — `promptfuzzr fuzz --config config/lab.yaml`
+        resolves correctly whether you run it from the project root or
+        somewhere else, without hardcoding an absolute, user-specific
+        path into a file meant to be shared/committed.
+
+        A `db_path` key is deliberately NOT read from the YAML, even if
+        present — the database location is always
+        promptfuzzr.storage.paths.get_db_path() (~/.promptfuzzr/db/),
+        not a per-run setting. If an old config file still has a
+        `db_path` key (e.g. from before this was centralized), it's
+        ignored with a warning rather than silently doing nothing, so
+        the mismatch between what's in the file and what actually
+        happens isn't a surprise.
         """
         path = Path(path)
         config_dir = path.parent.resolve()
         raw = yaml.safe_load(path.read_text())
+
+        if "db_path" in raw:
+            warnings.warn(
+                f"{path}: 'db_path' is set but is no longer a valid config field — "
+                "the database location is always managed by the application "
+                "(~/.promptfuzzr/db/) and can't be overridden via YAML. "
+                "Remove 'db_path' from this file; it is being ignored.",
+                stacklevel=2,
+            )
 
         def _resolve(raw_path: str) -> Path:
             p = Path(raw_path)
@@ -119,7 +148,6 @@ class RunConfig:
         return cls(
             target_id=raw["target_id"],
             corpus_dir=_resolve(raw["corpus_dir"]),
-            db_path=_resolve(raw.get("db_path", "promptfuzzr.db")),
             axes=raw.get("axes", ["delivery", "encoding"]),
             retry_policy=retry_policy,
             authority_policy=authority_policy,
@@ -127,6 +155,7 @@ class RunConfig:
             model_provider=raw.get("model_provider", "anthropic"),
             model_name=raw.get("model_name", "claude-sonnet-4-6"),
             target_profile=raw.get("target_profile", "real"),
+            agent_endpoint=raw.get("agent_endpoint"),
             delivery=raw.get("delivery", "direct"),
             propagation=raw.get("propagation", "single_shot"),
             max_follow_up_turns=raw.get("max_follow_up_turns", 2),

@@ -21,20 +21,28 @@ from promptfuzzr.models import (
     Verdict,
     VerdictBasis,
 )
+from promptfuzzr.storage.paths import get_db_path
 
 _SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 
-def init_db(db_path: Path) -> sqlite3.Connection:
+def init_db(db_path: Path | None = None) -> sqlite3.Connection:
     """Open (creating if needed) the SQLite DB at db_path and ensure the
     schema exists. Safe to call repeatedly — schema.sql uses
     CREATE TABLE IF NOT EXISTS throughout.
+
+    db_path defaults to get_db_path() — the centralized, platform-
+    independent application database location (~/.promptfuzzr/db/).
+    Passing an explicit db_path is for test fixtures that need an
+    isolated file; production code should call init_db() with no
+    argument.
 
     Also applies additive migrations for columns added after Phase 0
     (CREATE TABLE IF NOT EXISTS won't touch an existing table). Each
     migration is a try/ignore ALTER TABLE: if the column already exists
     the ALTER fails with OperationalError and that's fine.
     """
+    db_path = db_path or get_db_path()
     conn = sqlite3.connect(db_path)
     conn.executescript(_SCHEMA_PATH.read_text())
     for stmt in (

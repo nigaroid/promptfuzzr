@@ -120,14 +120,18 @@ def mutate(
 def fuzz(
     config: Path = typer.Option(..., "--config", help="RunConfig YAML path, e.g. config/lab.example.yaml"),
 ) -> None:
-    """Run the corpus (Phase 1: direct delivery, plain encoding,
-    single-shot) against the configured target and store every result.
+    """Run the corpus against the configured target and store every
+    result. See config.py's `delivery`/`propagation` fields for which
+    surfaces and modes are available.
 
-    Only the lab_agent target is wired up for now — see
-    targets/agent_harness.py. local_model/hosted_api are still stubs.
+    Supports: the local lab_agent (via AgentHarnessTarget, with
+    target_profile real|vulnerable and model_provider
+    anthropic|openai_compat), and remote agents under test that expose
+    an OpenAI-compatible endpoint (via agent_endpoint, e.g. DVAA).
     """
     from promptfuzzr.config import RunConfig
     from promptfuzzr.orchestrator.engine import run_corpus
+    from promptfuzzr.storage.paths import get_db_path
     from promptfuzzr.targets.agent_harness import (
         AgentHarnessTarget,
         AnthropicModelClient,
@@ -136,10 +140,12 @@ def fuzz(
 
     run_config = RunConfig.from_yaml(config)
 
-    if run_config.target_id != "lab_agent":
+    # Remote agents (DVAA etc.) bring their own identity; the local
+    # harness check only applies to non-endpoint runs.
+    if not run_config.agent_endpoint and run_config.target_id != "lab_agent":
         raise typer.BadParameter(
             f"target_id '{run_config.target_id}' is not wired up yet — "
-            f"only 'lab_agent' is implemented (see targets/agent_harness.py)"
+            f"use 'lab_agent' locally, or set agent_endpoint for a remote target"
         )
 
     if run_config.authority_policy is None:
@@ -148,6 +154,23 @@ def fuzz(
             "judge has nothing to compare tool calls against without it. "
             "See config/lab.example.yaml."
         )
+
+    if run_config.agent_endpoint:
+        # External agent under test (e.g. DVAA) — no local model client;
+        # the remote target owns its own system prompt and tools.
+        from promptfuzzr.targets.remote_agent import RemoteAgentTarget, probe_endpoint
+
+        if not probe_endpoint(run_config.agent_endpoint):
+            raise typer.BadParameter(
+                f"agent_endpoint '{run_config.agent_endpoint}' is not reachable — "
+                f"is the container/agent running?"
+            )
+        typer.echo(f"Targeting remote agent at {run_config.agent_endpoint}")
+        results = run_corpus(run_config, RemoteAgentTarget(endpoint=run_config.agent_endpoint))
+        successes = sum(1 for r in results if r.verdict.value == "success")
+        typer.echo(f"Ran {len(results)} test cases — {successes} successful.")
+        typer.echo(f"Results stored in {get_db_path()}")
+        return
 
     if run_config.target_profile == "vulnerable":
         from promptfuzzr.targets.agent_harness import VulnerableAgentModelClient
@@ -177,23 +200,20 @@ def fuzz(
 
     successes = sum(1 for r in results if r.verdict.value == "success")
     typer.echo(f"Ran {len(results)} test cases — {successes} successful.")
-    typer.echo(f"Results stored in {run_config.db_path}")
+    typer.echo(f"Results stored in {get_db_path()}")
 
 
 @app.command()
 def findings(
     run_id: str = typer.Option(None, help="Run id to filter by; defaults to the most recent run"),
     verdict: str = typer.Option("success", help="Filter by verdict: success | partial | fail | error"),
-    db_path: Path = typer.Option(Path("promptfuzzr.db")),
 ) -> None:
     """Quick list of test cases matching a verdict — check progress
     mid-run without generating a full report.
     """
-    import json
-
     from promptfuzzr.storage.db import init_db, load_test_cases
 
-    conn = init_db(db_path)
+    conn = init_db()
     if not run_id:
         row = conn.execute("SELECT run_id FROM runs ORDER BY started_at DESC LIMIT 1").fetchone()
         if row is None:
@@ -224,7 +244,6 @@ def findings(
 @app.command()
 def minimize(
     finding_id: str = typer.Argument(..., help="TestCase id of a successful finding"),
-    db_path: Path = typer.Option(Path("promptfuzzr.db")),
 ) -> None:
     """Reduce a successful payload to a minimal reproducer."""
     raise NotImplementedError("TODO(phase 5): wire into minimize/ddmin.py")
@@ -233,7 +252,6 @@ def minimize(
 @app.command()
 def report(
     run_id: str = typer.Argument(..., help="Run id to report on"),
-    db_path: Path = typer.Option(Path("promptfuzzr.db")),
     fmt: str = typer.Option("table", help="table | html | json"),
 ) -> None:
     """Full report: coverage matrix, defense-delta, and findings with

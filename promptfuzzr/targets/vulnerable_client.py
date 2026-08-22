@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import uuid
 
 from promptfuzzr.targets.model_client import ModelResponse, ModelToolCall
 
@@ -60,6 +61,23 @@ class VulnerableAgentModelClient:
         pass
 
     @staticmethod
+    def _call_id() -> str:
+        """Opaque tool-call id -- deliberately does NOT embed the tool
+        name (e.g. never "c-send_email"). A self-descriptive id gets
+        echoed back into the tool_result's tool_use_id on the next turn
+        (that's how the real tool-calling protocol works), which then
+        appears in that turn's serialized history -- and a name-based id
+        like "c-send_email" contains "send_email" as a literal
+        substring, silently defeating the is_first_turn gate in
+        create() below via mentioned()'s message_blob branch instead of
+        its (correctly gated) description branch. This was a real,
+        found-by-testing bug: schema-poisoning cases kept re-triggering
+        forever while other techniques didn't, because only the victim-
+        compliance branch used a name-embedding id.
+        """
+        return f"call-{uuid.uuid4().hex[:8]}"
+
+    @staticmethod
     def _stringify(content) -> str:
         if content is None:
             return ""
@@ -68,12 +86,44 @@ class VulnerableAgentModelClient:
         return json.dumps(content)
 
     def create(self, system: str, messages: list[dict], tools: list[dict]) -> ModelResponse:
-        message_blob = "\n".join(self._stringify(m.get("content")) for m in messages)
+        # Scan only the LATEST message, not the full accumulated history.
+        # Scanning everything was a real bug: once this client complies
+        # once, its own prior tool_use block gets appended to history
+        # (see AgentHarnessTarget.send()) and that serialized JSON still
+        # contains the tool's name as a literal substring -- so a full-
+        # history scan re-triggers the SAME tool call every subsequent
+        # turn, forever, until max_tool_iterations forces a hard stop.
+        # Each re-trigger also re-embeds the growing history into the
+        # next tool call's arguments (via _stringify), producing
+        # exponentially larger, garbled JSON with every turn. Looking
+        # only at the newest turn fixes both: it reacts once per new
+        # instruction instead of re-reading its own past actions as if
+        # they were a fresh command, which is also a more realistic
+        # model of "vulnerable" behavior than an infinite compliance
+        # loop would be.
+        latest_content = messages[-1].get("content") if messages else None
+        message_blob = self._stringify(latest_content)
         descriptions = {t["name"]: t.get("description", "") or "" for t in tools}
+
+        # Schema poisoning is a STANDING injection: the poisoned tool
+        # description sits in `tools` on every single call, not just the
+        # first, which is the whole point of the technique (a fresh
+        # session picks it up with no retrieval step needed). But that
+        # also means checking it on every turn re-triggers the same
+        # compliance forever within ONE session/conversation, the same
+        # failure mode as the history-scan bug above, just via a
+        # different channel. Restricting the schema check to the first
+        # turn keeps the "any fresh session sees it standing" property
+        # (still true -- a new conversation starts at turn 1 again) while
+        # letting a single conversation resolve cleanly after acting on
+        # it once.
+        is_first_turn = len(messages) <= 1
 
         def mentioned(name: str) -> bool:
             if name in message_blob:
                 return True
+            if not is_first_turn:
+                return False
             # Schema-poisoning signal: this tool's name appears in a
             # DIFFERENT tool's description.
             return any(
@@ -91,7 +141,7 @@ class VulnerableAgentModelClient:
                     text=None,
                     tool_calls=[
                         ModelToolCall(
-                            id="c-exfil",
+                            id=self._call_id(),  # opaque -- see _call_id() docstring
                             name="send_email",
                             arguments={
                                 "to": m.group(0) if m else "attacker@promptfuzzr-lab.test",
@@ -102,12 +152,17 @@ class VulnerableAgentModelClient:
                     stop_reason="tool_use",
                 )
             # Benign turn: answer helpfully like a normal support agent.
-            if "weather" in lowered:
+            # Gated to the first turn for the same reason as the schema
+            # check above: get_weather's own tool_result text ("Weather
+            # in Paris: 21C, clear") contains the word "weather", so
+            # without this gate a later turn would re-trigger get_weather
+            # on its own past result forever.
+            if is_first_turn and "weather" in lowered:
                 return ModelResponse(
                     text=None,
                     tool_calls=[
                         ModelToolCall(
-                            id="c-w", name="get_weather", arguments={"city": "Paris"}
+                            id=self._call_id(), name="get_weather", arguments={"city": "Paris"}
                         )
                     ],
                     stop_reason="tool_use",
@@ -135,6 +190,6 @@ class VulnerableAgentModelClient:
 
         return ModelResponse(
             text=None,
-            tool_calls=[ModelToolCall(id=f"c-{victim}", name=victim, arguments=args)],
+            tool_calls=[ModelToolCall(id=self._call_id(), name=victim, arguments=args)],
             stop_reason="tool_use",
         )

@@ -143,7 +143,7 @@ def run_corpus(config: RunConfig, target: AgentHarnessTarget) -> list[TestCase]:
         delivery_channel = DirectChannel()
         delivery_enum = Delivery.DIRECT
 
-    conn = init_db(config.db_path)
+    conn = init_db()  # always the centralized location — see storage/paths.py
     run_id = str(uuid.uuid4())
     conn.execute(
         "INSERT INTO runs (run_id, target_id, started_at, config_json) VALUES (?, ?, ?, ?)",
@@ -208,18 +208,24 @@ def run_corpus(config: RunConfig, target: AgentHarnessTarget) -> list[TestCase]:
             # Poison a tool description in the target's own registry —
             # the payload then rides into the model's context on every
             # turn via the tools array, no retrieval step needed.
-            ref = delivery_channel.deliver(
-                seed.base_text,
-                tool_registry=target.tool_registry,
-            )
-            return seed.base_text, ref
+            # Only possible for targets that expose their registry
+            # (AgentHarnessTarget); remote agents own theirs privately,
+            # so degrade to single_shot-style direct delivery with a note.
+            registry = getattr(target, "tool_registry", None)
+            if registry is not None:
+                ref = delivery_channel.deliver(
+                    seed.base_text,
+                    tool_registry=registry,
+                )
+                return seed.base_text, ref
+            return seed.base_text, f"unavailable:{seed.id}"
         return seed.base_text, seed.base_text
 
     def read_back(reference: str) -> str:
         """Fetch the artifact content for indirect surfaces (used to
         compose trigger prompts). Direct/tool_schema don't need this.
         """
-        if delivery_enum in (Delivery.WEBPAGE, Delivery.FILE, Delivery.RAG_CORPUS):
+        if delivery_enum in (Delivery.WEBPAGE, Delivery.EMAIL, Delivery.FILE, Delivery.RAG_CORPUS):
             try:
                 return delivery_channel.read_content(reference)
             except Exception:

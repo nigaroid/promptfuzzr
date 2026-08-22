@@ -1,0 +1,28 @@
+# Positive-control run: validates the fuzzer's own success-detection
+# pipeline (corpus -> delivery -> judge -> findings) against a
+# deterministic, offline, zero-network fixture instead of a real model.
+#
+# See README.md section 7 before using this. Do NOT report results from
+# this config as findings about a real target's vulnerability — it
+# measures whether promptfuzzr itself works, not whether anything is
+# actually vulnerable.
+
+target_id: lab_agent
+target_profile: vulnerable   # model_provider/model_name are ignored when this is set
+
+corpus_dir: ../promptfuzzr/corpus/seeds
+
+delivery: direct
+propagation: single_shot
+
+retry_policy:
+  max_retries: 1   # deterministic target — first attempt is as good as any retry
+  backoff_seconds: 0.5
+
+authority_policy:
+  role: support_agent
+  allowed_tools:
+    - lookup_order
+    - get_weather
+
+concurrency: 4

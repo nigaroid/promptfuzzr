@@ -1,0 +1,56 @@
+# Fuzz run config: DVAA (Damn Vulnerable AI Agent) as the target.
+#
+# Start the fleet first:
+#   docker run -d --name dvaa -p 9000:9000 -p 7001-7023:7001-7023 opena2a/dvaa:latest
+#
+# Agent picks (OpenAI-compatible API agents):
+#
+# SecureBot       [HARDENED]  http://localhost:7001  (api)
+# HelperBot       [WEAK]  http://localhost:7002  (api)
+# LegacyBot       [CRITICAL]  http://localhost:7003  (api)
+# CodeBot         [VULNERABLE]  http://localhost:7004  (api)
+# RAGBot          [WEAK]  http://localhost:7005  (api)
+# RAGBot-AIM      [WEAK]  http://localhost:7014  (api)
+# ResearchBot     [WEAK]  http://localhost:7015  (api)
+# ResearchBot-AIM [WEAK]  http://localhost:7016  (api)
+# FlightBot       [WEAK]  http://localhost:7017  (api)
+# FlightBot-AIM   [WEAK]  http://localhost:7018  (api)
+# VisionBot       [WEAK]  http://localhost:7006  (api)
+# MemoryBot       [VULNERABLE]  http://localhost:7007  (api)
+# LongwindBot     [WEAK]  http://localhost:7008  (api)
+# ToolBot         [VULNERABLE]  http://localhost:7010  (mcp)
+# DataBot         [WEAK]  http://localhost:7011  (mcp)
+# PluginBot       [VULNERABLE]  http://localhost:7012  (mcp)
+# ProxyBot        [VULNERABLE]  http://localhost:7013  (mcp)
+# Orchestrator    [STANDARD]  http://localhost:7020  (a2a)
+# Worker Agent    [WEAK]  http://localhost:7021  (a2a)
+
+target_id: dvaa_legacybot
+
+# Send the corpus straight to the remote agent; it brings its own
+# system prompt, tools, and defenses (or lack thereof).
+# NOTE: port 7012 isn't in the agent table above — target_id names
+# LegacyBot, whose documented port is 7003. Changed to match; double
+# check this against your actual running fleet if you intended a
+# different (e.g. custom/6th) agent on 7012.
+agent_endpoint: http://localhost:7021
+
+corpus_dir: ../promptfuzzr/corpus/seeds
+
+delivery: direct
+propagation: single_shot
+max_follow_up_turns: 2
+concurrency: 4
+
+retry_policy:
+  max_retries: 3
+  backoff_seconds: 1.0
+
+# LegacyBot has no real authority policy of its own that we can query,
+# but the judge needs one to define what "unauthorized" means for a
+# support-agent-shaped target. Same lab policy as local runs.
+authority_policy:
+  role: support_agent
+  allowed_tools:
+    - lookup_order
+    - get_weather
