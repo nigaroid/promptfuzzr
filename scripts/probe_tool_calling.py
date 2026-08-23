@@ -1,18 +1,3 @@
-"""Standalone probe: does the model behind omniroute actually call tools,
-or does it just talk about calling them? Run this BEFORE `promptfuzzr fuzz`
-— if this fails, the problem is the router/model, not the fuzzer.
-
-Usage:
-    set OPENAI_COMPAT_API_KEY=sk-f931a24b8ad5e7a9-d5f5d4-6db71deb   (Windows cmd)
-    $env:OPENAI_COMPAT_API_KEY="sk-f931a24b8ad5e7a9-d5f5d4-6db71deb" (PowerShell)
-    set OPENAI_COMPAT_BASE_URL=http://localhost:20128/v1
-    python probe_tool_calling.py <model-name>
-
-Replace <model-name> with whatever model id omniroute exposes for the
-model you want to test (check omniroute's own docs/UI for the exact id
-string — this script can't guess it for you).
-"""
-
 import os
 import sys
 

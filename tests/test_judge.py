@@ -1,8 +1,3 @@
-"""Unit tests for judge/ — action_outcome.py (Phase 4) and
-heuristic.py (Phase 1). Both against fabricated inputs; no live target
-needed for either.
-"""
-
 from __future__ import annotations
 
 from promptfuzzr.config import AuthorityPolicy

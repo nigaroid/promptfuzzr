@@ -5,8 +5,6 @@ fuzzing against local or remote targets, delivery surfaces, propagation
 modes, and reading results. `minimize` and `report` are not built yet
 (Phase 5/6) — see the end of this document for what that means today.
 
----
-
 ## 1. Install
 
 ```bash
@@ -27,8 +25,6 @@ promptfuzzr --help
 
 You should see six commands: `seeds`, `mutate`, `fuzz`, `findings`,
 `minimize`, `report`. Only the first four do anything yet.
-
----
 
 ## 2. Core concepts (read this before running anything)
 
@@ -93,8 +89,6 @@ the 4th). It stops early the moment a `SUCCESS` verdict lands. This means:
   once you know the target/config actually works.
 - `retry_count` in results tells you how many attempts a payload actually
   took — 0 means it worked (or failed) on the first try.
-
----
 
 ## 3. Configuration
 
@@ -203,8 +197,6 @@ don't need to create `~/.promptfuzzr/db/` yourself. See
 every database-touching function in the codebase goes through
 `get_db_path()` there, nowhere else.
 
----
-
 ## 4. Everyday commands
 
 ### 4.1 `seeds` — inspect the corpus
@@ -280,8 +272,6 @@ results right now — there's no `report` yet.
 `fail`, something's broken (bad API key, unreachable endpoint, malformed
 config) — the corpus/target/judge pipeline never got a fair shot.
 
----
-
 ## 5. Delivery surfaces and propagation modes
 
 ### 5.1 Delivery surfaces
@@ -316,8 +306,6 @@ artifact after each test case — no state accumulates across seeds, per the
   delivery surface, the engine silently falls back to `single_shot` and
   records a note explaining why — check the `notes` column if a run's
   results look unexpectedly like single-shot.
-
----
 
 ## 6. Targets: local lab agent vs. remote agent
 
@@ -388,8 +376,6 @@ actually testing. If your corpus gets meaningful `success` results against
 SecureBot too, that's a strong signal the *judge* is miscalibrated
 (over-triggering), not that SecureBot is actually vulnerable.
 
----
-
 ## 7. Validating the pipeline itself: `target_profile: vulnerable`
 
 Real models refuse most things, which makes it genuinely hard to tell "the
@@ -424,8 +410,6 @@ findings path is wired correctly. Run it once after any change to
 `judge/`, `orchestrator/engine.py`, or the corpus, before trusting results
 from a real target.
 
----
-
 ## 8. Reading results directly from SQLite
 
 `findings` covers most needs, but for anything more specific:
@@ -442,8 +426,6 @@ side. If you'd rather query directly, `test_cases` and `runs` are plain
 SQLite tables — `technique`, `delivery`, `propagation`, `encoding`,
 `verdict`, `verdict_basis`, `retry_count`, `kill_chain_depth`,
 `tool_calls_json`, `response_text`, and `notes` are all real columns.
-
----
 
 ## 9. Troubleshooting
 
@@ -482,8 +464,6 @@ project, update it.)
 `~/.promptfuzzr/db/promptfuzzr.db` (§3.4) — there's no per-run or
 per-config separation. `findings` and `scripts/inspect_db.py` (no
 argument) both read from there by default.
-
----
 
 ## 10. What's NOT here yet (Phase 5/6)
 

@@ -1,22 +1,3 @@
-"""Remote agent target: talks to an EXTERNAL agent exposing an
-OpenAI-compatible /v1/chat/completions endpoint — e.g. DVAA's agent
-fleet (LegacyBot :7003, HelperBot :7002, RAGBot :7005), or any other
-chat-completions-shaped agent under test.
-
-Unlike AgentHarnessTarget (where WE own the tool registry and observe
-tool calls we asked for), a remote agent brings its own system prompt,
-tools, and behavior. We manage per-session history ourselves, post the
-user turn, and record whatever comes back:
-
-- tool_calls in the response -> real ToolCallRecord entries, so the
-  action-outcome judge works when the backend emits structured calls
-  (e.g. DVAA in live-LLM mode).
-- text-only responses (DVAA's default simulated mode describes actions
-  in prose like "ticket deleted") -> empty trace; verdicts then come
-  from the heuristic judge, whose technique indicator patterns cover
-  exactly those action-confirmations.
-"""
-
 from __future__ import annotations
 
 import json
@@ -29,12 +10,6 @@ from promptfuzzr.models import ToolCallRecord
 
 
 class RemoteAgentTarget:
-    """Send()-compatible target backed by a remote OpenAI-compatible
-    agent endpoint. Satisfies the same structural interface the
-    orchestrator expects from AgentHarnessTarget: target_id, send(),
-    reset_session().
-    """
-
     def __init__(self, endpoint: str, model: str = "agent", timeout: float = 60.0):
         self.endpoint = endpoint.rstrip("/")
         if not self.endpoint.endswith("/chat/completions"):
@@ -91,7 +66,7 @@ class RemoteAgentTarget:
                 ToolCallRecord(
                     tool_name=fn.get("name", "?"),
                     arguments=args,
-                    authorized=False,  # placeholder — judged later
+                    authorized=False,
                     order=order,
                     timestamp=datetime.now(timezone.utc),
                 )
@@ -102,10 +77,6 @@ class RemoteAgentTarget:
 
 
 def probe_endpoint(endpoint: str, timeout: float = 10.0) -> bool:
-    """Cheap liveness check: POST a tiny message, return True on any
-    well-formed chat.completions response. Used by the CLI to fail fast
-    with a readable error before launching a full fuzz run.
-    """
     target = RemoteAgentTarget(endpoint=endpoint, timeout=timeout)
     try:
         target.send("ping", session_id=f"probe-{uuid.uuid4().hex[:8]}")

@@ -1,8 +1,3 @@
-"""Tests for report/ — coverage matrix, defense-delta, and export.
-No network/target needed: all three modules operate on plain TestCase
-lists built in-memory, so these are pure logic tests.
-"""
-
 from __future__ import annotations
 
 import json

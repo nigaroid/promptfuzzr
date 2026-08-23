@@ -1,10 +1,3 @@
-"""Text-only target adapter for a hosted API (OpenAI/Anthropic/Replicate
--style). Same degraded-case caveat as local_model.py.
-
-TODO(phase 1): implement a thin wrapper over the relevant SDK, reading
-API keys from environment variables only (never hardcode credentials).
-"""
-
 from __future__ import annotations
 
 from promptfuzzr.models import ToolCallRecord

@@ -1,10 +1,7 @@
-"""Secondary judge: uses an LLM to evaluate "did the attack succeed?"
+"""
+Uses an LLM to evaluate "did the attack succeed?"
 given (payload, response). Slower and costs tokens; run after the
 heuristic pre-filter as a confirmation/disambiguation step.
-
-TODO(phase 5): implement evaluate() with a fixed judge prompt template;
-cache judgments per (payload_hash, response_hash) to avoid re-spending
-on retries.
 """
 
 from __future__ import annotations

@@ -1,7 +1,3 @@
--- promptfuzzr SQLite schema
--- TODO(phase 0): review/extend once orchestrator/engine.py and
--- report/ solidify their query patterns.
-
 CREATE TABLE IF NOT EXISTS runs (
     run_id TEXT PRIMARY KEY,
     target_id TEXT NOT NULL,

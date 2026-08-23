@@ -1,15 +1,3 @@
-"""End-to-end verification for roadmap phases 0-3.
-
-Run from the project root:
-    python scripts/verify_phases.py            # offline, no model/router needed
-    python scripts/verify_phases.py --live     # also runs live fuzz per delivery
-                                               # surface (needs the local router
-                                               # on OPENAI_COMPAT_BASE_URL)
-
-Each phase prints PASS/FAIL per check; the script exits non-zero if any
-check fails, so it can double as a CI smoke test.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -29,16 +17,6 @@ RESULTS: list[tuple[str, str, str]] = []  # (phase, check, PASS/FAIL)
 
 @contextlib.contextmanager
 def isolated_db_dir(tmp_dir):
-    """Redirect promptfuzzr's database to an isolated temp directory for
-    the duration of the block, via the ONE sanctioned override mechanism
-    in promptfuzzr/storage/paths.py (PROMPTFUZZR_DB_DIR). Every test
-    that calls run_corpus() must use this -- run_corpus() always calls
-    init_db() with no argument now (the database location is no longer
-    part of RunConfig), so without this override a test would silently
-    write into the real ~/.promptfuzzr/db/ instead of a throwaway temp
-    dir. Restores whatever PROMPTFUZZR_DB_DIR was set to (or unsets it)
-    on exit, so tests don't leak the override into each other.
-    """
     old = os.environ.get("PROMPTFUZZR_DB_DIR")
     os.environ["PROMPTFUZZR_DB_DIR"] = str(tmp_dir)
     try:

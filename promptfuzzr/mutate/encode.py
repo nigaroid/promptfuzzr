@@ -1,12 +1,5 @@
-"""Encoding mutators: base64, rot13, hex, leetspeak, invisible unicode.
-
-TODO(phase 2): implement each as a small pure function, then a
-composite EncodeMutator that can target either the whole payload or
-just the sensitive substring, per roadmap.md section 5 notes on
-output-guardrail bypass technique (character-insertion obfuscation).
-"""
-
 from __future__ import annotations
+
 import base64
 import codecs
 
@@ -38,29 +31,15 @@ _LEET_TABLE = str.maketrans(
 
 
 def to_leetspeak(text: str) -> str:
-    """Simple character-substitution leetspeak (a->4, e->3, i->1, o->0,
-    s->5, t->7, l->1, g->9). Deliberately not "full" leetspeak (no
-    multi-char digraphs like |-|) — this axis is about slipping past a
-    naive keyword filter while staying human-readable, not maximal
-    obfuscation.
-    """
     return text.translate(_LEET_TABLE)
 
 
 def insert_invisible_unicode(text: str, marker: str = "\u200b") -> str:
-    """Insert a zero-width character between every character.
-    See roadmap.md Study 7 — measure whether this still works on the
-    target *and* whether a naive strip-on-ingest defense neutralizes it.
-    """
     if not text:
         return text
     return marker.join(list(text))
 
 
-# A few other zero-width / invisible code points worth rotating through,
-# beyond the default ZERO WIDTH SPACE — different defenses strip
-# different subsets of these, so varying the marker is itself a useful
-# encoding sub-axis.
 _INVISIBLE_MARKERS = [
     "\u200b",  # zero width space
     "\u200c",  # zero width non-joiner
@@ -90,8 +69,6 @@ class EncodeMutator:
         for marker in _INVISIBLE_MARKERS:
             candidates.append(insert_invisible_unicode(seed_text, marker=marker))
 
-        # de-dupe while preserving order (e.g. leetspeak may equal the
-        # original for payloads with no substitutable characters)
         seen: set[str] = set()
         variants: list[str] = []
         for candidate in candidates:

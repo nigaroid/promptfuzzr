@@ -1,17 +1,3 @@
-"""Sentence-restructuring mutator (Phase 2).
-
-Rephrases the seed's grammatical framing while preserving intent:
-imperative -> question -> conditional -> third-person/reported-speech
--> "helpful completion" framing. These are template-based rewrites
-(not an LLM call) so the mutator stays pure and offline, per base.py's
-contract.
-
-Each template is a function seed_text -> str | None; it returns None
-when it can't sensibly apply (e.g. the question template on a seed
-that's already phrased as a question), so `mutate` only emits variants
-that actually changed the framing.
-"""
-
 from __future__ import annotations
 
 import re
@@ -79,12 +65,6 @@ class RestructureMutator:
     name = "restructure"
 
     def mutate(self, seed_text: str, count: int = 10) -> list[str]:
-        """Return up to `count` variants, one per applicable template,
-        in a fixed order (question, conditional, reported-speech,
-        helpful-completion, third-person-scenario, double-negative).
-        Templates that don't apply to this seed (e.g. it's already a
-        question) are skipped rather than padded with duplicates.
-        """
         if not seed_text or not seed_text.strip():
             return []
 

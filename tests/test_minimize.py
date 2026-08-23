@@ -1,10 +1,3 @@
-"""Unit tests for minimize/ddmin.py — the Phase 5 delta-debugging
-minimizer. Split into: pure-logic tests for chunk_payload/ddmin (no
-target/network at all), and pipeline tests for minimize_test_case
-against a fake ModelClient (verifies the real delivery/judge wiring
-without needing a live model).
-"""
-
 from __future__ import annotations
 
 import pytest

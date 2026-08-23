@@ -1,15 +1,3 @@
-"""CLI entrypoint. Registered as the `promptfuzzr` console script in
-pyproject.toml.
-
-Commands map directly to the phases in roadmap.md:
-  seeds     -> Phase 1 (payload corpus)
-  mutate    -> Phase 2 (mutation engine, previewed with no target needed)
-  fuzz      -> Phase 3/4 (delivery + orchestration + judge — the actual attack run)
-  findings  -> Phase 4/5 (quick list of successes, no formatting)
-  minimize  -> Phase 5 (ddmin-style reducer)
-  report    -> Phase 6 (coverage matrix, defense-delta, full export)
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -29,7 +17,6 @@ _DEFAULT_CORPUS = Path(__file__).parent / "corpus" / "seeds"
 def seeds_list(
     corpus_dir: Path = typer.Option(_DEFAULT_CORPUS, help="Seed corpus directory"),
 ) -> None:
-    """List available payload seeds by technique."""
     from promptfuzzr.corpus.loader import load_seeds
 
     seeds = load_seeds(corpus_dir)
@@ -46,7 +33,6 @@ def seeds_show(
     seed_id: str = typer.Argument(..., help="Seed id, e.g. instr-override-001"),
     corpus_dir: Path = typer.Option(_DEFAULT_CORPUS),
 ) -> None:
-    """Show the full text and metadata for one seed."""
     from promptfuzzr.corpus.loader import load_seeds
 
     for seed in load_seeds(corpus_dir):
@@ -67,9 +53,6 @@ def mutate(
     axis: str = typer.Option("encoding", help="Axis to mutate: encoding | delivery | propagation"),
     count: int = typer.Option(10, help="Number of variants to generate"),
 ) -> None:
-    """Preview mutated variants of a seed payload. No target required —
-    useful for sanity-checking a mutator before spending a fuzz run on it.
-    """
     from promptfuzzr.corpus.loader import load_seeds
     from promptfuzzr.mutate.encode import EncodeMutator
     from promptfuzzr.mutate.fake_delimiter import FakeDelimiterMutator
@@ -77,7 +60,6 @@ def mutate(
     from promptfuzzr.mutate.split import SplitMutator
     from promptfuzzr.mutate.synonym import SynonymMutator
 
-    # Resolve the argument: a known seed id wins, otherwise treat it as raw text.
     seed_text = seed
     resolved_id = "(raw text)"
     for candidate in load_seeds(_DEFAULT_CORPUS):
@@ -105,7 +87,6 @@ def mutate(
             shown += 1
             label = f"{mutator.name}#{i + 1}"
             typer.echo(f"--- {label} ---")
-            # split returns dicts of field->chunk; stringify the rest
             if isinstance(variant, dict):
                 for field_name, chunk in variant.items():
                     typer.echo(f"  [{field_name}] {chunk}")
@@ -117,21 +98,6 @@ def mutate(
 
 
 def _build_target(run_config):
-    """Construct the target the given RunConfig describes — shared by
-    `fuzz` and `minimize`, since minimizing a finding must replay it
-    against the EXACT SAME kind of target the original run used (same
-    provider, same profile, same authority policy). Before this was
-    extracted, this dispatch existed only inline inside `fuzz`; adding
-    `minimize` without sharing it would have meant two independently-
-    drifting copies of "how do I turn a RunConfig into a live target",
-    the same duplication risk already avoided elsewhere in this
-    codebase (see orchestrator/engine.py's compose_trigger_prompt).
-
-    Returns the target instance, or raises typer.BadParameter with a
-    clear message if the config can't be turned into one (unreachable
-    remote endpoint, unrecognized provider, etc.) — both callers can
-    let that propagate as-is, Typer renders it the same way either way.
-    """
     if run_config.agent_endpoint:
         from promptfuzzr.targets.remote_agent import RemoteAgentTarget, probe_endpoint
 
@@ -178,15 +144,6 @@ def _build_target(run_config):
 def fuzz(
     config: Path = typer.Option(..., "--config", help="RunConfig YAML path, e.g. config/lab.example.yaml"),
 ) -> None:
-    """Run the corpus against the configured target and store every
-    result. See config.py's `delivery`/`propagation` fields for which
-    surfaces and modes are available.
-
-    Supports: the local lab_agent (via AgentHarnessTarget, with
-    target_profile real|vulnerable and model_provider
-    anthropic|openai_compat), and remote agents under test that expose
-    an OpenAI-compatible endpoint (via agent_endpoint, e.g. DVAA).
-    """
     from promptfuzzr.config import RunConfig
     from promptfuzzr.orchestrator.engine import run_corpus
     from promptfuzzr.storage.paths import get_db_path
@@ -224,9 +181,6 @@ def findings(
     run_id: str = typer.Option(None, help="Run id to filter by; defaults to the most recent run"),
     verdict: str = typer.Option("success", help="Filter by verdict: success | partial | fail | error"),
 ) -> None:
-    """Quick list of test cases matching a verdict — check progress
-    mid-run without generating a full report.
-    """
     from promptfuzzr.storage.db import init_db, load_most_recent_run_id, load_test_cases
 
     conn = init_db()
@@ -266,15 +220,6 @@ def minimize(
         2, help="Re-checks per candidate before concluding it doesn't reproduce (non-determinism hedge)"
     ),
 ) -> None:
-    """Reduce a successful payload to a minimal reproducer.
-
-    Requires --config pointing at the SAME config the finding was
-    produced with — minimization replays candidate payloads against a
-    freshly-built target using that config's provider/profile and
-    authority_policy. A different policy would minimize against a
-    different notion of "success" than the one that actually found
-    this case (see minimize/ddmin.py's module docstring).
-    """
     from promptfuzzr.config import RunConfig
     from promptfuzzr.judge.action_outcome import ActionOutcomeJudge
     from promptfuzzr.minimize.ddmin import minimize_test_case
@@ -341,10 +286,6 @@ def report(
         None, help="Output file path for html/json (defaults to report.<fmt> in the current directory)"
     ),
 ) -> None:
-    """Full report: coverage matrix, verdict breakdown, findings with
-    minimized reproducers where available, and — if --compare-run-id
-    is given — a defense-delta table between the two runs.
-    """
     from promptfuzzr.report.coverage import build_coverage_matrix
     from promptfuzzr.report.defense_delta import compare_runs
     from promptfuzzr.report.export import export_html, export_json, export_table

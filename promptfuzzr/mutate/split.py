@@ -1,22 +1,6 @@
-"""Payload-splitting mutator (Phase 2).
-
-Splits a seed payload into N fragments intended for N separate
-delivery fields (e.g. first_name / last_name / company), such that no
-single fragment trips a naive per-field keyword filter but the target
-recombines them at read time (e.g. rendering all form fields into one
-prompt/document). Output shape differs from other mutators — returns
-list[dict[field_name, fragment]] rather than list[str]; this mirrors
-that divergence explicitly via a distinct method name (`split`) in
-addition to satisfying the shared `mutate` name for registry lookup.
-"""
-
 from __future__ import annotations
 
 
-# Default field-name sets to distribute fragments across. Different
-# sets model different real-world multi-field surfaces (a signup form
-# vs. a support ticket vs. a CSV upload) — pick whichever list has
-# enough slots for the requested fragment count.
 _FIELD_NAME_SETS: list[list[str]] = [
     ["first_name", "last_name", "company", "notes"],
     ["ticket_subject", "ticket_body", "ticket_tags"],
@@ -49,12 +33,6 @@ class SplitMutator:
     name = "split"
 
     def mutate(self, seed_text: str, count: int = 10) -> list[dict[str, str]]:
-        """Return up to `count` fragmentations of seed_text, each a
-        dict mapping a field name to its fragment. Fragment counts
-        range from 2 up to (count + 1), each using a plausible
-        field-name set of matching size, so a single call surfaces
-        several different granularities of split to test against.
-        """
         if not seed_text or not seed_text.strip():
             return []
 

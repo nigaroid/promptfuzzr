@@ -1,11 +1,3 @@
-"""Core data models shared across the corpus, mutation, orchestration,
-judge, and reporting layers.
-
-These are the load-bearing types referenced throughout roadmap.md — get
-the shape of ToolCallRecord / TestCase right early (Phase 0) since the
-action-outcome judge and minimizer both depend on it.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -21,7 +13,7 @@ class Delivery(str, Enum):
     REPO_COMMENT = "repo_comment"
     CALENDAR = "calendar"
     TOOL_OUTPUT = "tool_output"
-    TOOL_SCHEMA = "tool_schema"  # first-class differentiator surface
+    TOOL_SCHEMA = "tool_schema"
     RAG_CORPUS = "rag_corpus"
 
 
@@ -59,7 +51,7 @@ class Technique(str, Enum):
     BUSINESS_LOGIC_MANIPULATION = "business_logic_manipulation"
     CHAINED_WEB_ATTACK = "chained_web_attack"
     INSECURE_OUTPUT_HANDLING = "insecure_output_handling"
-    SCHEMA_POISONING = "schema_poisoning"  # first-class differentiator technique
+    SCHEMA_POISONING = "schema_poisoning"
 
 
 class Verdict(str, Enum):
@@ -70,24 +62,13 @@ class Verdict(str, Enum):
 
 
 class VerdictBasis(str, Enum):
-    ACTION_OUTCOME = "action_outcome"  # primary — see judge/action_outcome.py
+    ACTION_OUTCOME = "action_outcome"
     HEURISTIC = "heuristic"
     LLM_JUDGE = "llm_judge"
 
 
 @dataclass
 class ToolCallRecord:
-    """One observed tool invocation during a target run.
-
-    `authorized` is a placeholder at record time (default False) — it
-    is NOT set by the target adapter or orchestrator. The single source
-    of truth for authorization is judge/action_outcome.py, which
-    compares `tool_name` against the session's AuthorityPolicy at judge
-    time and returns a verdict. The judge is read-only: it does not
-    mutate this field. Treat this value as meaningless until a verdict
-    has been computed; don't rely on it directly elsewhere.
-    """
-
     tool_name: str
     arguments: dict
     authorized: bool
@@ -97,8 +78,6 @@ class ToolCallRecord:
 
 @dataclass
 class PayloadSeed:
-    """A single entry loaded from corpus/seeds/*.yaml."""
-
     id: str
     technique: Technique
     base_text: str
@@ -107,23 +86,6 @@ class PayloadSeed:
 
 @dataclass
 class TestCase:
-    """One point in the delivery x propagation x encoding x technique
-    space, plus its execution result. See roadmap.md section 2 for the
-    full rationale.
-
-    __test__ = False below is NOT part of the domain model — it's the
-    standard pytest convention that tells pytest's collector to skip
-    this class. Without it, any test file that does `from
-    promptfuzzr.models import TestCase` gets a PytestCollectionWarning
-    ("cannot collect test class 'TestCase' because it has a __init__
-    constructor"), since pytest's default discovery treats any
-    module-level class named Test* as a candidate test class. Renaming
-    the domain class was considered and rejected — TestCase is the
-    correct, established name for what this represents throughout the
-    codebase (see roadmap.md's own data model section), and a rename
-    would touch dozens of files for a purely cosmetic pytest quirk.
-    """
-
     __test__ = False
 
     id: str
@@ -143,10 +105,6 @@ class TestCase:
     confidence: float = 0.0
     retry_count: int = 0
 
-    # Phase 4 severity metric (roadmap section 3): how many chained tool
-    # calls the agent executed before the chain broke. For single-shot
-    # cases this is just len(tool_calls); for multi-step propagation it's
-    # the cumulative count across all turns of the session.
     kill_chain_depth: int = 0
 
     minimized_payload: str | None = None

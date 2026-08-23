@@ -1,9 +1,3 @@
-"""Unit tests for mutate/. Each mutator is tested in isolation with no
-target/network dependency — pure string-in, string(s)-out (except
-translate.py, which is network-backed by nature and tested for
-graceful degradation rather than exact output).
-"""
-
 from __future__ import annotations
 
 from promptfuzzr.mutate.encode import EncodeMutator, to_base64, to_hex, to_leetspeak, to_rot13

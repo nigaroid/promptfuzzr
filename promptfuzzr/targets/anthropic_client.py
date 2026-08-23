@@ -1,16 +1,9 @@
-"""AnthropicModelClient — thin wrapper over the real Anthropic SDK."""
-
 from __future__ import annotations
 
 from promptfuzzr.targets.model_client import ModelResponse, ModelToolCall
 
 
 class AnthropicModelClient:
-    """Thin wrapper over the real Anthropic SDK. Reads the API key from
-    the ANTHROPIC_API_KEY environment variable — never hardcode a key
-    here or pass one as a plain argument that could end up logged.
-    """
-
     def __init__(self, model: str = "claude-sonnet-4-6", max_tokens: int = 1024):
         import anthropic  # imported lazily so importing this module doesn't require the SDK
 
@@ -19,8 +12,6 @@ class AnthropicModelClient:
         self.max_tokens = max_tokens
 
     def create(self, system: str, messages: list[dict], tools: list[dict]) -> ModelResponse:
-        # Translate the generic {name, description, parameters} shape
-        # into Anthropic's specific {name, description, input_schema}.
         anthropic_tools = [
             {"name": t["name"], "description": t["description"], "input_schema": t["parameters"]}
             for t in tools

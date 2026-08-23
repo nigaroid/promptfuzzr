@@ -1,10 +1,3 @@
-"""Thin SQLite persistence layer over schema.sql.
-
-save_test_case / load_test_cases are implemented now (pure serialization,
-no design decisions pending). start_run / finish_run are left for Phase 1
-since they depend on how orchestrator/engine.py wants to generate run_ids.
-"""
-
 from __future__ import annotations
 
 import json
@@ -27,21 +20,6 @@ _SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 
 def init_db(db_path: Path | None = None) -> sqlite3.Connection:
-    """Open (creating if needed) the SQLite DB at db_path and ensure the
-    schema exists. Safe to call repeatedly — schema.sql uses
-    CREATE TABLE IF NOT EXISTS throughout.
-
-    db_path defaults to get_db_path() — the centralized, platform-
-    independent application database location (~/.promptfuzzr/db/).
-    Passing an explicit db_path is for test fixtures that need an
-    isolated file; production code should call init_db() with no
-    argument.
-
-    Also applies additive migrations for columns added after Phase 0
-    (CREATE TABLE IF NOT EXISTS won't touch an existing table). Each
-    migration is a try/ignore ALTER TABLE: if the column already exists
-    the ALTER fails with OperationalError and that's fine.
-    """
     db_path = db_path or get_db_path()
     conn = sqlite3.connect(db_path)
     conn.executescript(_SCHEMA_PATH.read_text())
@@ -57,9 +35,6 @@ def init_db(db_path: Path | None = None) -> sqlite3.Connection:
 
 
 def save_test_case(conn: sqlite3.Connection, run_id: str, test_case: TestCase) -> None:
-    """Insert or replace a TestCase row. Enum fields are stored as their
-    .value; list/dict fields are stored as JSON.
-    """
     tool_calls_json = json.dumps(
         [
             {
@@ -138,9 +113,6 @@ def _row_to_test_case(row: sqlite3.Row) -> TestCase:
 
 
 def load_test_cases(conn: sqlite3.Connection, run_id: str, verdict: str | None = None) -> list[TestCase]:
-    """Load all TestCases for a run, optionally filtered by verdict
-    (e.g. "success" — used by cli.py::findings).
-    """
     conn.row_factory = sqlite3.Row
     if verdict:
         cursor = conn.execute(
@@ -152,12 +124,6 @@ def load_test_cases(conn: sqlite3.Connection, run_id: str, verdict: str | None =
 
 
 def load_test_case_by_id(conn: sqlite3.Connection, test_case_id: str) -> tuple[TestCase, str] | None:
-    """Look up a single TestCase by its own id, regardless of which run
-    it belongs to — used by cli.py::minimize, whose only input is a
-    finding_id (no run_id). Returns (test_case, run_id) so the caller
-    can save the result back with save_test_case() using the SAME
-    run_id, or None if no row has that id.
-    """
     conn.row_factory = sqlite3.Row
     row = conn.execute("SELECT * FROM test_cases WHERE id = ?", (test_case_id,)).fetchone()
     if row is None:
@@ -166,11 +132,6 @@ def load_test_case_by_id(conn: sqlite3.Connection, test_case_id: str) -> tuple[T
 
 
 def load_run_meta(conn: sqlite3.Connection, run_id: str) -> dict | None:
-    """Look up a run's own metadata row — used by report/ to print a
-    header (target, when it ran) above the findings. Returns a plain
-    dict rather than a dataclass since this is display-only data with
-    no behavior attached to it; None if no run has that id.
-    """
     conn.row_factory = sqlite3.Row
     row = conn.execute(
         "SELECT run_id, target_id, started_at, finished_at, config_json FROM runs WHERE run_id = ?",
@@ -182,10 +143,6 @@ def load_run_meta(conn: sqlite3.Connection, run_id: str) -> dict | None:
 
 
 def load_most_recent_run_id(conn: sqlite3.Connection) -> str | None:
-    """The run_id of the most recently started run, or None if the
-    database has no runs at all yet. Used wherever a command lets
-    run_id default to "whatever I just ran" (e.g. cli.py::findings).
-    """
     conn.row_factory = sqlite3.Row
     row = conn.execute("SELECT run_id FROM runs ORDER BY started_at DESC LIMIT 1").fetchone()
     return row["run_id"] if row else None

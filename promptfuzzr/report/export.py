@@ -1,10 +1,3 @@
-"""Export a run's results/report to table (rich), HTML (jinja2), or
-JSON. All three take the same core inputs — test_cases, the coverage
-matrix, and optionally a run_meta dict / defense-delta result — so the
-CLI's report command can build those once and hand them to whichever
-export function --fmt selected.
-"""
-
 from __future__ import annotations
 
 import json
@@ -19,10 +12,6 @@ def export_table(
     run_meta: dict | None = None,
     defense_delta: dict | None = None,
 ) -> None:
-    """Print a rich table summary to stdout: run header, per-axis
-    coverage, verdict breakdown, defense-delta (if provided), and the
-    findings list with minimized_payload shown where available.
-    """
     from rich.console import Console
     from rich.table import Table
 
@@ -99,12 +88,6 @@ def export_json(
     run_meta: dict | None = None,
     defense_delta: dict | None = None,
 ) -> None:
-    """Dump the full report — run metadata, coverage matrix,
-    defense-delta (if given), and every test case — as one JSON file.
-    Every field on TestCase is included (not just findings), so this
-    is suitable as a raw data export for further analysis, not just a
-    human-readable summary.
-    """
     payload = {
         "run_meta": run_meta,
         "coverage": coverage,
@@ -235,11 +218,6 @@ def export_html(
     run_meta: dict | None = None,
     defense_delta: dict | None = None,
 ) -> None:
-    """Render a single self-contained HTML file (inline CSS, no
-    external assets) — the coverage matrix, verdict breakdown,
-    defense-delta table (if given), and the findings list with
-    minimized_payload highlighted where available.
-    """
     import jinja2
 
     verdict_counts: dict[str, int] = {}
