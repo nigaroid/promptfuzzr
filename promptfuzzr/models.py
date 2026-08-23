@@ -9,7 +9,7 @@ action-outcome judge and minimizer both depend on it.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 
@@ -92,7 +92,7 @@ class ToolCallRecord:
     arguments: dict
     authorized: bool
     order: int
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -110,7 +110,21 @@ class TestCase:
     """One point in the delivery x propagation x encoding x technique
     space, plus its execution result. See roadmap.md section 2 for the
     full rationale.
+
+    __test__ = False below is NOT part of the domain model — it's the
+    standard pytest convention that tells pytest's collector to skip
+    this class. Without it, any test file that does `from
+    promptfuzzr.models import TestCase` gets a PytestCollectionWarning
+    ("cannot collect test class 'TestCase' because it has a __init__
+    constructor"), since pytest's default discovery treats any
+    module-level class named Test* as a candidate test class. Renaming
+    the domain class was considered and rejected — TestCase is the
+    correct, established name for what this represents throughout the
+    codebase (see roadmap.md's own data model section), and a rename
+    would touch dozens of files for a purely cosmetic pytest quirk.
     """
+
+    __test__ = False
 
     id: str
     technique: Technique

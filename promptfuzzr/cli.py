@@ -116,48 +116,23 @@ def mutate(
     typer.echo(f"\n{shown} variants generated from {resolved_id} (axis={axis}).")
 
 
-@app.command()
-def fuzz(
-    config: Path = typer.Option(..., "--config", help="RunConfig YAML path, e.g. config/lab.example.yaml"),
-) -> None:
-    """Run the corpus against the configured target and store every
-    result. See config.py's `delivery`/`propagation` fields for which
-    surfaces and modes are available.
+def _build_target(run_config):
+    """Construct the target the given RunConfig describes — shared by
+    `fuzz` and `minimize`, since minimizing a finding must replay it
+    against the EXACT SAME kind of target the original run used (same
+    provider, same profile, same authority policy). Before this was
+    extracted, this dispatch existed only inline inside `fuzz`; adding
+    `minimize` without sharing it would have meant two independently-
+    drifting copies of "how do I turn a RunConfig into a live target",
+    the same duplication risk already avoided elsewhere in this
+    codebase (see orchestrator/engine.py's compose_trigger_prompt).
 
-    Supports: the local lab_agent (via AgentHarnessTarget, with
-    target_profile real|vulnerable and model_provider
-    anthropic|openai_compat), and remote agents under test that expose
-    an OpenAI-compatible endpoint (via agent_endpoint, e.g. DVAA).
+    Returns the target instance, or raises typer.BadParameter with a
+    clear message if the config can't be turned into one (unreachable
+    remote endpoint, unrecognized provider, etc.) — both callers can
+    let that propagate as-is, Typer renders it the same way either way.
     """
-    from promptfuzzr.config import RunConfig
-    from promptfuzzr.orchestrator.engine import run_corpus
-    from promptfuzzr.storage.paths import get_db_path
-    from promptfuzzr.targets.agent_harness import (
-        AgentHarnessTarget,
-        AnthropicModelClient,
-        OpenAICompatibleModelClient,
-    )
-
-    run_config = RunConfig.from_yaml(config)
-
-    # Remote agents (DVAA etc.) bring their own identity; the local
-    # harness check only applies to non-endpoint runs.
-    if not run_config.agent_endpoint and run_config.target_id != "lab_agent":
-        raise typer.BadParameter(
-            f"target_id '{run_config.target_id}' is not wired up yet — "
-            f"use 'lab_agent' locally, or set agent_endpoint for a remote target"
-        )
-
-    if run_config.authority_policy is None:
-        raise typer.BadParameter(
-            "authority_policy is required in the config — the action_outcome "
-            "judge has nothing to compare tool calls against without it. "
-            "See config/lab.example.yaml."
-        )
-
     if run_config.agent_endpoint:
-        # External agent under test (e.g. DVAA) — no local model client;
-        # the remote target owns its own system prompt and tools.
         from promptfuzzr.targets.remote_agent import RemoteAgentTarget, probe_endpoint
 
         if not probe_endpoint(run_config.agent_endpoint):
@@ -165,12 +140,13 @@ def fuzz(
                 f"agent_endpoint '{run_config.agent_endpoint}' is not reachable — "
                 f"is the container/agent running?"
             )
-        typer.echo(f"Targeting remote agent at {run_config.agent_endpoint}")
-        results = run_corpus(run_config, RemoteAgentTarget(endpoint=run_config.agent_endpoint))
-        successes = sum(1 for r in results if r.verdict.value == "success")
-        typer.echo(f"Ran {len(results)} test cases — {successes} successful.")
-        typer.echo(f"Results stored in {get_db_path()}")
-        return
+        return RemoteAgentTarget(endpoint=run_config.agent_endpoint)
+
+    from promptfuzzr.targets.agent_harness import (
+        AgentHarnessTarget,
+        AnthropicModelClient,
+        OpenAICompatibleModelClient,
+    )
 
     if run_config.target_profile == "vulnerable":
         from promptfuzzr.targets.agent_harness import VulnerableAgentModelClient
@@ -195,7 +171,47 @@ def fuzz(
             f"use 'anthropic' or 'openai_compat'"
         )
 
-    target = AgentHarnessTarget(model_client=model_client)
+    return AgentHarnessTarget(model_client=model_client)
+
+
+@app.command()
+def fuzz(
+    config: Path = typer.Option(..., "--config", help="RunConfig YAML path, e.g. config/lab.example.yaml"),
+) -> None:
+    """Run the corpus against the configured target and store every
+    result. See config.py's `delivery`/`propagation` fields for which
+    surfaces and modes are available.
+
+    Supports: the local lab_agent (via AgentHarnessTarget, with
+    target_profile real|vulnerable and model_provider
+    anthropic|openai_compat), and remote agents under test that expose
+    an OpenAI-compatible endpoint (via agent_endpoint, e.g. DVAA).
+    """
+    from promptfuzzr.config import RunConfig
+    from promptfuzzr.orchestrator.engine import run_corpus
+    from promptfuzzr.storage.paths import get_db_path
+
+    run_config = RunConfig.from_yaml(config)
+
+    # Remote agents (DVAA etc.) bring their own identity; the local
+    # harness check only applies to non-endpoint runs.
+    if not run_config.agent_endpoint and run_config.target_id != "lab_agent":
+        raise typer.BadParameter(
+            f"target_id '{run_config.target_id}' is not wired up yet — "
+            f"use 'lab_agent' locally, or set agent_endpoint for a remote target"
+        )
+
+    if run_config.authority_policy is None:
+        raise typer.BadParameter(
+            "authority_policy is required in the config — the action_outcome "
+            "judge has nothing to compare tool calls against without it. "
+            "See config/lab.example.yaml."
+        )
+
+    if run_config.agent_endpoint:
+        typer.echo(f"Targeting remote agent at {run_config.agent_endpoint}")
+
+    target = _build_target(run_config)
     results = run_corpus(run_config, target)
 
     successes = sum(1 for r in results if r.verdict.value == "success")
@@ -211,15 +227,14 @@ def findings(
     """Quick list of test cases matching a verdict — check progress
     mid-run without generating a full report.
     """
-    from promptfuzzr.storage.db import init_db, load_test_cases
+    from promptfuzzr.storage.db import init_db, load_most_recent_run_id, load_test_cases
 
     conn = init_db()
     if not run_id:
-        row = conn.execute("SELECT run_id FROM runs ORDER BY started_at DESC LIMIT 1").fetchone()
-        if row is None:
+        run_id = load_most_recent_run_id(conn)
+        if run_id is None:
             typer.echo("No runs in the database yet — run `promptfuzzr fuzz` first.")
             raise typer.Exit(1)
-        run_id = row[0]
 
     cases = load_test_cases(conn, run_id, verdict=verdict)
     if not cases:
@@ -244,20 +259,133 @@ def findings(
 @app.command()
 def minimize(
     finding_id: str = typer.Argument(..., help="TestCase id of a successful finding"),
+    config: Path = typer.Option(
+        ..., "--config", help="The SAME RunConfig YAML the finding was produced with"
+    ),
+    verify_retries: int = typer.Option(
+        2, help="Re-checks per candidate before concluding it doesn't reproduce (non-determinism hedge)"
+    ),
 ) -> None:
-    """Reduce a successful payload to a minimal reproducer."""
-    raise NotImplementedError("TODO(phase 5): wire into minimize/ddmin.py")
+    """Reduce a successful payload to a minimal reproducer.
+
+    Requires --config pointing at the SAME config the finding was
+    produced with — minimization replays candidate payloads against a
+    freshly-built target using that config's provider/profile and
+    authority_policy. A different policy would minimize against a
+    different notion of "success" than the one that actually found
+    this case (see minimize/ddmin.py's module docstring).
+    """
+    from promptfuzzr.config import RunConfig
+    from promptfuzzr.judge.action_outcome import ActionOutcomeJudge
+    from promptfuzzr.minimize.ddmin import minimize_test_case
+    from promptfuzzr.models import Verdict
+    from promptfuzzr.storage.db import init_db, load_test_case_by_id, save_test_case
+
+    run_config = RunConfig.from_yaml(config)
+
+    if run_config.authority_policy is None:
+        raise typer.BadParameter(
+            "authority_policy is required in the config — the action_outcome "
+            "judge has nothing to compare tool calls against without it."
+        )
+
+    conn = init_db()
+    result = load_test_case_by_id(conn, finding_id)
+    if result is None:
+        typer.echo(f"No test case with id '{finding_id}' found in the database.")
+        raise typer.Exit(1)
+    test_case, run_id = result
+
+    if test_case.verdict != Verdict.SUCCESS:
+        typer.echo(
+            f"Test case {finding_id} has verdict '{test_case.verdict.value}', not "
+            f"'success' — only a successful finding has anything to minimize."
+        )
+        raise typer.Exit(1)
+
+    target = _build_target(run_config)
+    action_judge = ActionOutcomeJudge(run_config.authority_policy)
+
+    typer.echo(f"Original payload ({len(test_case.payload)} chars):")
+    typer.echo(f"  {test_case.payload!r}")
+    typer.echo("Minimizing (this replays candidates against the target — may take a while)...")
+
+    try:
+        minimized = minimize_test_case(
+            test_case, target, action_judge=action_judge, verify_retries=verify_retries
+        )
+    except NotImplementedError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(1)
+    except RuntimeError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(1)
+
+    save_test_case(conn, run_id, test_case)
+
+    typer.echo("")
+    typer.echo(f"Minimized payload ({len(minimized)} chars):")
+    typer.echo(f"  {minimized!r}")
+    reduction_pct = 100 * (1 - len(minimized) / max(1, len(test_case.payload)))
+    typer.echo(f"Reduced by {reduction_pct:.0f}% — saved back to the database.")
 
 
 @app.command()
 def report(
     run_id: str = typer.Argument(..., help="Run id to report on"),
     fmt: str = typer.Option("table", help="table | html | json"),
+    compare_run_id: str = typer.Option(
+        None, help="Optional second run id — adds a defense-delta comparison table (this run vs. that one)"
+    ),
+    out: Path = typer.Option(
+        None, help="Output file path for html/json (defaults to report.<fmt> in the current directory)"
+    ),
 ) -> None:
-    """Full report: coverage matrix, defense-delta, and findings with
-    minimized reproducers where available.
+    """Full report: coverage matrix, verdict breakdown, findings with
+    minimized reproducers where available, and — if --compare-run-id
+    is given — a defense-delta table between the two runs.
     """
-    raise NotImplementedError("TODO(phase 6): wire into report/")
+    from promptfuzzr.report.coverage import build_coverage_matrix
+    from promptfuzzr.report.defense_delta import compare_runs
+    from promptfuzzr.report.export import export_html, export_json, export_table
+    from promptfuzzr.storage.db import init_db, load_run_meta, load_test_cases
+
+    if fmt not in ("table", "html", "json"):
+        raise typer.BadParameter(f"fmt '{fmt}' not recognized — use table, html, or json")
+
+    conn = init_db()
+    run_meta = load_run_meta(conn, run_id)
+    if run_meta is None:
+        typer.echo(f"No run with id '{run_id}' found in the database.")
+        raise typer.Exit(1)
+
+    test_cases = load_test_cases(conn, run_id)
+    if not test_cases:
+        typer.echo(f"Run '{run_id}' has no test cases.")
+        raise typer.Exit(1)
+
+    coverage = build_coverage_matrix(test_cases)
+
+    defense_delta = None
+    if compare_run_id:
+        compare_meta = load_run_meta(conn, compare_run_id)
+        if compare_meta is None:
+            typer.echo(f"--compare-run-id '{compare_run_id}' not found in the database.")
+            raise typer.Exit(1)
+        compare_cases = load_test_cases(conn, compare_run_id)
+        defense_delta = compare_runs(test_cases, compare_cases)
+        typer.echo(f"Comparing {run_id} (baseline) against {compare_run_id} (comparison)...")
+
+    if fmt == "table":
+        export_table(test_cases, coverage, run_meta=run_meta, defense_delta=defense_delta)
+        return
+
+    out_path = out or Path(f"report.{fmt}")
+    if fmt == "html":
+        export_html(test_cases, coverage, out_path, run_meta=run_meta, defense_delta=defense_delta)
+    else:
+        export_json(test_cases, coverage, out_path, run_meta=run_meta, defense_delta=defense_delta)
+    typer.echo(f"Report written to {out_path}")
 
 
 if __name__ == "__main__":

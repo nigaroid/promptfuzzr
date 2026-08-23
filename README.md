@@ -1,4 +1,4 @@
-# PromptFuzzr — User Manual (Phases 0–4)
+# promptfuzzr — User Manual (Phases 0–4)
 
 This covers everything currently working: seed corpus, mutation preview,
 fuzzing against local or remote targets, delivery surfaces, propagation

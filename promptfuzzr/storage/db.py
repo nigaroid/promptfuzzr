@@ -149,3 +149,43 @@ def load_test_cases(conn: sqlite3.Connection, run_id: str, verdict: str | None =
     else:
         cursor = conn.execute("SELECT * FROM test_cases WHERE run_id = ?", (run_id,))
     return [_row_to_test_case(row) for row in cursor.fetchall()]
+
+
+def load_test_case_by_id(conn: sqlite3.Connection, test_case_id: str) -> tuple[TestCase, str] | None:
+    """Look up a single TestCase by its own id, regardless of which run
+    it belongs to — used by cli.py::minimize, whose only input is a
+    finding_id (no run_id). Returns (test_case, run_id) so the caller
+    can save the result back with save_test_case() using the SAME
+    run_id, or None if no row has that id.
+    """
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT * FROM test_cases WHERE id = ?", (test_case_id,)).fetchone()
+    if row is None:
+        return None
+    return _row_to_test_case(row), row["run_id"]
+
+
+def load_run_meta(conn: sqlite3.Connection, run_id: str) -> dict | None:
+    """Look up a run's own metadata row — used by report/ to print a
+    header (target, when it ran) above the findings. Returns a plain
+    dict rather than a dataclass since this is display-only data with
+    no behavior attached to it; None if no run has that id.
+    """
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT run_id, target_id, started_at, finished_at, config_json FROM runs WHERE run_id = ?",
+        (run_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return dict(row)
+
+
+def load_most_recent_run_id(conn: sqlite3.Connection) -> str | None:
+    """The run_id of the most recently started run, or None if the
+    database has no runs at all yet. Used wherever a command lets
+    run_id default to "whatever I just ran" (e.g. cli.py::findings).
+    """
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT run_id FROM runs ORDER BY started_at DESC LIMIT 1").fetchone()
+    return row["run_id"] if row else None

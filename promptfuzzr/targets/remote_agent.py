@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
@@ -93,7 +93,7 @@ class RemoteAgentTarget:
                     arguments=args,
                     authorized=False,  # placeholder — judged later
                     order=order,
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),
                 )
             )
 

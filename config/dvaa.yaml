@@ -4,26 +4,11 @@
 #   docker run -d --name dvaa -p 9000:9000 -p 7001-7023:7001-7023 opena2a/dvaa:latest
 #
 # Agent picks (OpenAI-compatible API agents):
-#
-# SecureBot       [HARDENED]  http://localhost:7001  (api)
-# HelperBot       [WEAK]  http://localhost:7002  (api)
-# LegacyBot       [CRITICAL]  http://localhost:7003  (api)
-# CodeBot         [VULNERABLE]  http://localhost:7004  (api)
-# RAGBot          [WEAK]  http://localhost:7005  (api)
-# RAGBot-AIM      [WEAK]  http://localhost:7014  (api)
-# ResearchBot     [WEAK]  http://localhost:7015  (api)
-# ResearchBot-AIM [WEAK]  http://localhost:7016  (api)
-# FlightBot       [WEAK]  http://localhost:7017  (api)
-# FlightBot-AIM   [WEAK]  http://localhost:7018  (api)
-# VisionBot       [WEAK]  http://localhost:7006  (api)
-# MemoryBot       [VULNERABLE]  http://localhost:7007  (api)
-# LongwindBot     [WEAK]  http://localhost:7008  (api)
-# ToolBot         [VULNERABLE]  http://localhost:7010  (mcp)
-# DataBot         [WEAK]  http://localhost:7011  (mcp)
-# PluginBot       [VULNERABLE]  http://localhost:7012  (mcp)
-# ProxyBot        [VULNERABLE]  http://localhost:7013  (mcp)
-# Orchestrator    [STANDARD]  http://localhost:7020  (a2a)
-# Worker Agent    [WEAK]  http://localhost:7021  (a2a)
+#   LegacyBot  http://localhost:7003  CRITICAL   — everything exploitable
+#   HelperBot  http://localhost:7002  WEAK       — overly eager follower
+#   RAGBot     http://localhost:7005  WEAK       — injectable knowledge base
+#   MemoryBot  http://localhost:7007  VULNERABLE — context/memory poisoning
+#   SecureBot  http://localhost:7001  HARDENED   — control: should resist
 
 target_id: dvaa_legacybot
 
@@ -33,7 +18,7 @@ target_id: dvaa_legacybot
 # LegacyBot, whose documented port is 7003. Changed to match; double
 # check this against your actual running fleet if you intended a
 # different (e.g. custom/6th) agent on 7012.
-agent_endpoint: http://localhost:7021
+agent_endpoint: http://localhost:7003
 
 corpus_dir: ../promptfuzzr/corpus/seeds
 
