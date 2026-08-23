@@ -142,7 +142,7 @@ def _build_target(run_config):
 
 @app.command()
 def fuzz(
-    config: Path = typer.Option(..., "--config", help="RunConfig YAML path, e.g. config/lab.example.yaml"),
+    config: Path = typer.Option(..., "--config", help="RunConfig YAML path, e.g. config/promptfuzzr.yaml"),
 ) -> None:
     from promptfuzzr.config import RunConfig
     from promptfuzzr.orchestrator.engine import run_corpus
@@ -160,7 +160,7 @@ def fuzz(
         raise typer.BadParameter(
             "authority_policy is required in the config — the action_outcome "
             "judge has nothing to compare tool calls against without it. "
-            "See config/lab.example.yaml."
+            "See config/promptfuzzr.yaml."
         )
 
     if run_config.agent_endpoint:

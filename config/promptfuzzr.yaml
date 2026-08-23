@@ -1,19 +1,25 @@
 target_id: lab_agent
-target_profile: vulnerable   # model_provider/model_name are ignored when this is set
-
 corpus_dir: ../promptfuzzr/corpus/seeds
 
+model_provider: anthropic
+model_name: claude-sonnet-4-6
+target_profile: real
+
+agent_endpoint: null
 delivery: direct
 propagation: single_shot
+max_follow_up_turns: 2
 
 retry_policy:
-  max_retries: 1
-  backoff_seconds: 0.5
+  max_retries: 3
+  backoff_seconds: 1.5
 
 authority_policy:
   role: support_agent
   allowed_tools:
     - lookup_order
     - get_weather
+  allowed_arg_values: {}
 
+axes: [delivery, encoding]
 concurrency: 4
