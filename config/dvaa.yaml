@@ -1,5 +1,3 @@
-# Fuzz run config: DVAA (Damn Vulnerable AI Agent) as the target.
-#
 # Start the fleet first:
 #   docker run -d --name dvaa -p 9000:9000 -p 7001-7023:7001-7023 opena2a/dvaa:latest
 #
@@ -12,12 +10,6 @@
 
 target_id: dvaa_legacybot
 
-# Send the corpus straight to the remote agent; it brings its own
-# system prompt, tools, and defenses (or lack thereof).
-# NOTE: port 7012 isn't in the agent table above — target_id names
-# LegacyBot, whose documented port is 7003. Changed to match; double
-# check this against your actual running fleet if you intended a
-# different (e.g. custom/6th) agent on 7012.
 agent_endpoint: http://localhost:7003
 
 corpus_dir: ../promptfuzzr/corpus/seeds
@@ -31,9 +23,6 @@ retry_policy:
   max_retries: 3
   backoff_seconds: 1.0
 
-# LegacyBot has no real authority policy of its own that we can query,
-# but the judge needs one to define what "unauthorized" means for a
-# support-agent-shaped target. Same lab policy as local runs.
 authority_policy:
   role: support_agent
   allowed_tools:

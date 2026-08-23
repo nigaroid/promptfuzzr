@@ -1,7 +1,3 @@
-# Example RunConfig — copy to lab.yaml and adjust.
-# Only target_id and corpus_dir are required; everything else has a
-# sensible default in config.py::RunConfig.
-
 target_id: lab_agent
 corpus_dir: ../promptfuzzr/corpus/seeds
 axes: [delivery, encoding]
@@ -10,9 +6,6 @@ retry_policy:
   max_retries: 8
   backoff_seconds: 1.5
 
-# Required once judge/action_outcome.py (Phase 4) is implemented —
-# defines what the lab agent is ALLOWED to do, so the judge can flag
-# any tool call outside this list as a successful attack.
 authority_policy:
   role: support_agent
   allowed_tools:

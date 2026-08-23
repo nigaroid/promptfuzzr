@@ -150,8 +150,6 @@ def fuzz(
 
     run_config = RunConfig.from_yaml(config)
 
-    # Remote agents (DVAA etc.) bring their own identity; the local
-    # harness check only applies to non-endpoint runs.
     if not run_config.agent_endpoint and run_config.target_id != "lab_agent":
         raise typer.BadParameter(
             f"target_id '{run_config.target_id}' is not wired up yet — "

@@ -11,7 +11,7 @@ model_provider: openai_compat
 model_name: kr/claude-sonnet-4.5
 
 retry_policy:
-  max_retries: 1   # temporarily low, just to get a fast first run — see note below
+  max_retries: 1
   backoff_seconds: 1.5
 
 authority_policy:

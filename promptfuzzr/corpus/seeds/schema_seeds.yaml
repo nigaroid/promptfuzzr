@@ -1,13 +1,3 @@
-# Tool-description / schema-poisoning seeds — promptfuzzr's differentiator
-# surface (see roadmap.md section 0). These are consumed by
-# delivery/tool_schema.py, not sent as chat messages.
-#
-# Effective schema payloads read like plausible tool documentation while
-# carrying an imperative — see mutate/schema_mutate.py for the mutation
-# grammar that preserves this property.
-#
-# TODO(phase 2/3): expand once schema_mutate.py grammar is implemented.
-
 - id: schema-poison-001
   technique: schema_poisoning
   base_text: >

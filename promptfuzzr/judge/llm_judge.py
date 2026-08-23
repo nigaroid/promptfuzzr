@@ -1,9 +1,3 @@
-"""
-Uses an LLM to evaluate "did the attack succeed?"
-given (payload, response). Slower and costs tokens; run after the
-heuristic pre-filter as a confirmation/disambiguation step.
-"""
-
 from __future__ import annotations
 
 from promptfuzzr.models import TestCase, Verdict

@@ -1,19 +1,3 @@
-"""
-Sends a crafted HTML email (payload hidden in an
-HTML comment) to a lab inbox via swaks, for agents with email-reading
-tools.
-
-Unlike webpage/file/rag_doc, there's no real inbox this channel can
-poll back from (that would need a live mail server + IMAP client,
-which is out of scope for a controlled lab fixture). So the delivered
-body is kept in an in-memory store keyed by reference, exactly the way
-a lab fixture should behave: read_content() always returns what was
-actually delivered, regardless of whether the swaks send itself
-succeeded, failed, or swaks isn't installed at all. The swaks call is
-attempted for realism/logging only -- it is never load-bearing for
-whether the test case can be judged correctly.
-"""
-
 from __future__ import annotations
 
 import subprocess
